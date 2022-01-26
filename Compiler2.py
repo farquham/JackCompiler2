@@ -18,18 +18,17 @@ def main():
             t.advance()
         else:
             tokens.append([(str(main_helper(TT,t))).strip(), TT.lower()])
-            #print("appendtest " + str(main_helper(TT,t)) + str(t.tcounter))
             t.advance()
     if (main_helper(t.tokenType(),t) in [None,"","\n"," "]):
         print("ignore")
     else:
         tokens.append([(str(main_helper(t.tokenType(),t))).strip(), TT.lower()])
 
-    tfilename = ((jfile.split(".")[0]) +"TC.xml")
-    tfiles = open(tfilename, "w")
-    for x in range(0,len(tokens)):
-        tfiles.write(str(tokens[x][0]) + " " + tokens[x][1] + "\n")
-    tfiles.close()
+    #tfilename = ((jfile.split(".")[0]) +"TC.xml")
+    #tfiles = open(tfilename, "w")
+    #for x in range(0,len(tokens)):
+    #    tfiles.write(str(tokens[x][0]) + " " + tokens[x][1] + "\n")
+    #tfiles.close()
 
     c = CompEngine(sys.argv[1],tokens)
     c.compileClass()
@@ -70,15 +69,11 @@ class Tokenizer:
         self.line = (self.lines)[self.lcounter]
         self.line = list(filter(filtfunc, re.split(r"(\;|\,|\.|[ ]|\[|\]|\(|\)|\n|\/|\t|\"|\-|\~)", self.line)))
         self.tcounter = 0
-        #print(self.line)
-        #print("initstart")
         while ((((self.line)[self.tcounter]) == "/") and (((self.line)[(self.tcounter)+1]) == "/")) or ((((self.line)[self.tcounter]) == "/") and (((self.line)[(self.tcounter)+1]) == "**")):
             self.lcounter += 1
             self.line = (self.lines)[self.lcounter]
             self.line = list(filter(filtfunc, re.split(r"(\;|\,|\.|[ ]|\[|\]|\(|\)|\n|\/|\t|\"|\-|\~)", self.line)))
             self.tcounter = 0
-            #print(self.line)
-            #print("initloop")
         self.tcounter = 0
         self.token = (self.line)[self.tcounter]
 
@@ -101,12 +96,9 @@ class Tokenizer:
             (re.match(r"\/\w+",self.token)) or
             ((self.token == "*") and (self.line[(self.tcounter)+1] == "/")) or
             (self.line[0] == "*")):
-            #print("tokentest1")
             self.lcounter += 1
             self.line = (self.lines)[self.lcounter]
             self.line = list(filter(filtfunc, re.split(r"(\;|\,|\.|[ ]|\[|\]|\(|\)|\n|\/|\t|\"|\-|\~)",self.line)))
-            #print(self.line)
-            #print("advancetest1")
             self.tcounter = 0
             while (((((self.line)[self.tcounter]) == "/") and (((self.line)[(self.tcounter)+1]) == "/")) or
                    ((((self.line)[self.tcounter]) == "/") and (((self.line)[(self.tcounter)+1]) == "**")) or
@@ -115,8 +107,6 @@ class Tokenizer:
                 self.line = (self.lines)[self.lcounter]
                 self.line = list(filter(filtfunc, re.split(r"(\;|\,|\.|[ ]|\[|\]|\(|\)|\n|\/|\t|\"|\-|\~)", self.line)))
                 self.tcounter = 0
-                #print(self.line)
-                #print("advancetest1loop")
             self.tcounter = 0
             self.token = (self.line)[self.tcounter]
             return
@@ -134,8 +124,6 @@ class Tokenizer:
             self.lcounter += 1
             self.line = (self.lines)[self.lcounter]
             self.line = list(filter(filtfunc, re.split(r"(\;|\,|\.|[ ]|\[|\]|\(|\)|\n|\/|\t|\"|\-|\~)",self.line)))
-            #print(self.line)
-            #print("advancetest2")
             self.tcounter = 0
             while (((((self.line)[self.tcounter]) == "/") and (((self.line)[(self.tcounter)+1]) == "/")) or
                    ((((self.line)[self.tcounter]) == "/") and (((self.line)[(self.tcounter)+1]) == "**")) or
@@ -144,8 +132,6 @@ class Tokenizer:
                 self.line = (self.lines)[self.lcounter]
                 self.line = list(filter(filtfunc, re.split(r"(\;|\,|\.|[ ]|\[|\]|\(|\)|\n|\/|\t|\"|\-|\~)", self.line)))
                 self.tcounter = 0
-                #print(self.line)
-                #print("advancetest2loop")
             self.tcounter = 0
             self.token = (self.line)[self.tcounter]
             return
@@ -229,13 +215,14 @@ class CompEngine:
     # Compiles a complete class
     def compileClass(self):
         self.newfile.write("<class>\n")
+        self.classname = (self.tokens[(self.count)+1][0])
         while (self.tokens[(self.count)][0] != "{"):
             self.newfile.write("<"+(self.tokens[self.count][1])+"> " + (self.tokens[self.count][0]) + " </"+(self.tokens[self.count][1])+">\n")
             self.count += 1
         self.newfile.write("<"+(self.tokens[self.count][1])+"> " + (self.tokens[self.count][0]) + " </"+(self.tokens[self.count][1])+">\n")
         self.count += 1
+        self.ST = SymbolTable()
         while ((self.count) < (len(self.tokens)-1)):
-            #print(self.tokens[self.count][0] + self.tokens[self.count][1] +  str(self.count))
             if (self.tokens[self.count][0] in ["static","field"]):
                 self.compileClassVarDec()
             if (self.tokens[self.count][0] in ["function","method","constructor"]):
@@ -250,9 +237,15 @@ class CompEngine:
     def compileClassVarDec(self):
         self.newfile.write("<classVarDec>\n")
         while (self.tokens[(self.count)][0] != ";"):
-              self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
-              self.count += 1
-        self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
+            if ((self.tokens[(self.count)][1] == "identifier") and (self.tokens[(self.count)-2][0] in ["static","field"])):
+                ttype = self.tokens[(self.count)-1][0]
+                kind = self.tokens[(self.count)-2][0]
+                self.ST.define((self.tokens[self.count][0]), ttype, kind)
+                self.newfile.write(self.tokens[self.count][0] + " " + kind + " " + (self.ST.IndexOf((self.tokens[self.count][0]))) + " defined\n")
+            elif ((self.tokens[(self.count)][1] == "identifier") and (self.tokens[(self.count)-1][0] == ",")):
+                self.ST.define((self.tokens[self.count][0]), ttype, kind)
+                self.newfile.write(self.tokens[self.count][0] + " " + kind + " " + (self.ST.IndexOf((self.tokens[self.count][0]))) + " defined\n")
+            self.count += 1
         self.count += 1
         self.newfile.write("</classVarDec>\n")
         return
@@ -262,8 +255,11 @@ class CompEngine:
         self.newfile.write("<subroutineDec>\n")
         self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
         self.count += 1
+        self.ST.startSubroutine()
+        if ((self.tokens[(self.count)-1][0]) == "method"):
+            self.ST.define("this",self.classname,"argument")
+            self.newfile.write("this " + "argument" + " " + (self.ST.IndexOf("this")) + " defined\n")
         while (self.tokens[self.count][1] != "symbol"):
-            print(self.tokens[self.count][0] + "," + self.tokens[self.count][1] + "," + str(self.count))
             self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
             self.count += 1
         if (self.tokens[self.count][0] == "("):
@@ -279,7 +275,11 @@ class CompEngine:
         self.count += 1
         self.newfile.write("<parameterList>\n")
         while (self.tokens[self.count][0] != ")"):
-            self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
+            if ((self.tokens[(self.count)][1] == "identifier") and (self.tokens[(self.count)-2][0] in ["(",","])):
+                ttype = self.tokens[(self.count)-1][0]
+                kind = "argument"
+                self.ST.define((self.tokens[self.count][0]), ttype, kind)
+                self.newfile.write(self.tokens[self.count][0] + " " + kind + " " + (self.ST.IndexOf((self.tokens[self.count][0]))) + " defined\n")
             self.count += 1
         self.newfile.write("</parameterList>\n")
         self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
@@ -292,7 +292,6 @@ class CompEngine:
         self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
         self.count += 1
         while (self.tokens[(self.count)][0] != "}"):
-            print(self.tokens[self.count][0] + self.tokens[self.count][1] + str(self.count))
             if (self.tokens[self.count][0] == "var"):
                 self.compileVarDec()
             if (self.tokens[self.count][0] in ["let","if","while","do","return"]):
@@ -307,10 +306,18 @@ class CompEngine:
         self.newfile.write("<varDec>\n")
         src = 0
         while ((self.tokens[(self.count)-1][0] != ";") or (self.tokens[self.count][0] == "var")) and (src < 1):
-              self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
-              self.count += 1
-              if ((self.tokens[(self.count)-1][0] == ";") and (self.tokens[self.count][0] == "var")):
+            if ((self.tokens[(self.count)][1] == "identifier") and (self.tokens[(self.count)-2][0] == "var")):
+                ttype = self.tokens[(self.count)-1][0]
+                kind = self.tokens[(self.count)-2][0]
+                self.ST.define((self.tokens[self.count][0]), ttype, kind)
+                self.newfile.write(self.tokens[self.count][0] + " " + kind + " " + (self.ST.IndexOf((self.tokens[self.count][0]))) + " defined\n")
+            elif ((self.tokens[(self.count)][1] == "identifier") and (self.tokens[(self.count)-1][0] == ",")):
+                self.ST.define((self.tokens[self.count][0]), ttype, kind)
+                self.newfile.write(self.tokens[self.count][0] + " " + kind + " " + (self.ST.IndexOf((self.tokens[self.count][0]))) + " defined\n")
+            self.count += 1
+            if ((self.tokens[(self.count)-1][0] == ";") and (self.tokens[self.count][0] == "var")):
                   src += 1
+        print(self.tokens[self.count][0])
         self.newfile.write("</varDec>\n")
         return
 
@@ -318,21 +325,15 @@ class CompEngine:
     def compileStatements(self):
         self.newfile.write("<statements>\n")
         while (self.tokens[self.count][0] != "}"):
-            print(self.tokens[self.count][0] + self.tokens[self.count][1] +  str(self.count))
             if (self.tokens[self.count][0] == "let"):
-                print("LET")
                 self.compileLet()
             if (self.tokens[self.count][0] == "if"):
-                print("IF")
                 self.compileIf()
             elif (self.tokens[self.count][0] == "while"):
-                print("WHILE")
                 self.compileWhile()
             elif (self.tokens[self.count][0] == "do"):
-                print("DO")
                 self.compileDo()
             elif (self.tokens[self.count][0] == "return"):
-                print("RETURN")
                 self.compileReturn()
         self.newfile.write("</statements>\n")
         self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
@@ -344,6 +345,9 @@ class CompEngine:
         self.newfile.write("<letStatement>\n")
         src = 0
         while ((self.tokens[(self.count)-1][0] != ";") or (self.tokens[(self.count)][0] == "let")) and (src < 1):
+            if (self.tokens[(self.count)][1] == "identifier"):
+                self.newfile.write((self.tokens[self.count][0]) + " " + (self.ST.KindOf((self.tokens[self.count][0]))) + " " + (self.ST.IndexOf((self.tokens[self.count][0]))) + " used\n")
+                self.count += 1
             if (self.tokens[self.count][0] in ["["]) :
                 self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
                 self.count += 1
@@ -414,8 +418,15 @@ class CompEngine:
         src = 0
         while ((self.tokens[(self.count)-1][0] != ";") or (self.tokens[(self.count)][0] == "do")):
             if (self.tokens[self.count][0] != "("):
-                self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
-                self.count += 1
+                if ((self.tokens[self.count][1] == "identifier") and (self.tokens[(self.count)-1][0] != ".")):
+                    self.newfile.write(self.tokens[self.count][0] + " " + (self.ST.KindOf((self.tokens[self.count][0]))) + " " + (self.ST.IndexOf((self.tokens[self.count][0]))) + " used\n")
+                    self.count += 1
+                elif ((self.tokens[self.count][1] == "identifier") and (self.tokens[(self.count)-1][0] == ".")):
+                    self.newfile.write(self.tokens[self.count][0] + " " + "subroutine" + " used\n")
+                    self.count += 1
+                else:
+                    self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
+                    self.count += 1
             else:
                 self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
                 self.count += 1
@@ -423,8 +434,6 @@ class CompEngine:
                 src += 1
             if ((self.tokens[(self.count)-1][0] == ";") and (self.tokens[(self.count)][0] == "do") and (src == 1)):
                 break
-        #self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
-        #self.count += 1
         self.newfile.write("</doStatement>\n")
         return
 
@@ -468,7 +477,6 @@ class CompEngine:
     def compileTerm(self):
         self.newfile.write("<term>\n")
         while (not(self.tokens[(self.count)-1][0] in [";",")","]"])):
-            #print(self.tokens[self.count][0])
             if (self.tokens[(self.count)][0] in [")","]",";",","]):
                 break
             if (self.tokens[(self.count)+1][0] == "[") and (self.tokens[(self.count)][1] == "identifier"):
@@ -509,6 +517,9 @@ class CompEngine:
                 self.count += 1
                 self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
                 self.count += 1
+            elif (self.tokens[(self.count)][1] == "identifier"):
+                self.newfile.write(self.tokens[self.count][0] + " " + (self.ST.KindOf((self.tokens[self.count][0]))) + " " + (self.ST.IndexOf((self.tokens[self.count][0]))) + " used\n")
+                self.count += 1
             else:
                 self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
                 self.count += 1
@@ -530,6 +541,118 @@ class CompEngine:
     # closes the output file
     def Close(self):
         self.newfile.close()
+
+# creates, stores, and updates the symbol tables needed to write the VM code
+class SymbolTable:
+    # initializes the class level symbol tables
+    def __init__(self):
+        self.stdic = {}
+        return
+
+    # initializes the subroutine level symbol table
+    def startSubroutine(self):
+        self.substdic = {}
+        return
+
+    # creates a symbol table entry for the given variable
+    def define(self, name, ttype, kind):
+        if (kind in ["static","field"]):
+            self.stdic[name] = (ttype + "," + kind + "," + str(self.VarCount(kind) + 1))
+        else:
+            self.substdic[name] = (ttype + "," + kind + "," + str((self.VarCount(kind) + 2)))
+        return
+
+    # counts how many of the current var kind already exist within the relevant
+    # symbol table
+    def VarCount(self, kind):
+        count = -1
+        if (kind in ["static","field"]):
+            for x in self.stdic:
+                if ((((self.stdic[x]).split(","))[1]) == kind):
+                    count += 1
+        else:
+            for x in self.substdic:
+                if ((((self.substdic[x]).split(","))[1]) == kind):
+                    count += 1
+        return count
+
+    # returns the kind of the requested var
+    def KindOf(self, name):
+        try:
+            kkind = ((((self.substdic)[name]).split(","))[1])
+            if ((name in self.substdic) and (kkind != None)):
+                return kkind
+            elif (name in self.stdic):
+                return ((((self.stdic)[name]).split(","))[1])
+        except:
+            if (name in self.stdic):
+                return ((((self.stdic)[name]).split(","))[1])
+            else:
+                return "subroutine"
+
+    # returns the type of the requested var
+    def TypeOf(self, name):
+        try:
+            ttype = ((((self.substdic)[name]).split(","))[0])
+            if ((name in self.substdic) and (ttype != None)):
+                return ttype
+            elif (name in self.stdic):
+                return ((((self.stdic)[name]).split(","))[0])
+        except:
+            if (name in self.stdic):
+                return ((((self.stdic)[name]).split(","))[0])
+            else:
+                return "NONE"
+
+    # returns the index of the requested var
+    def IndexOf(self, name):
+        try:
+            iindex = ((((self.substdic)[name]).split(","))[2])
+            if ((name in self.substdic) and (iindex != None)):
+                return iindex
+            elif (name in self.stdic):
+                return ((((self.stdic)[name]).split(","))[2])
+        except:
+            if (name in self.stdic):
+                return ((((self.stdic)[name]).split(","))[2])
+            else:
+                return "NONE"
+
+
+#class VMWriter:
+#    def __init__(self):
+#        return
+#
+#    def writePush(self, segment, index):
+#        return
+#
+#    def writePop(self, segment, index):
+#        return
+#
+#    def writeArithmetic(self, command):
+#        return
+#
+#    def writeLabel(self, label):
+#        return
+#
+#    def writeGoto(self, label):
+#        return
+#
+#    def writeIf(self, label):
+#        return
+#
+#    def writeCall(self, name, nArgs):
+#        return
+#
+#    def writeFunction(self, name, nLocals):
+#        return
+#
+#    def writeReturn(self):
+#        return
+#
+#    def close(self):
+#        return
+
 
 # Starts the program
 if __name__== "__main__":
