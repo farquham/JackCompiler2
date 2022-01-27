@@ -317,7 +317,6 @@ class CompEngine:
             self.count += 1
             if ((self.tokens[(self.count)-1][0] == ";") and (self.tokens[self.count][0] == "var")):
                   src += 1
-        print(self.tokens[self.count][0])
         self.newfile.write("</varDec>\n")
         return
 
@@ -479,44 +478,52 @@ class CompEngine:
         while (not(self.tokens[(self.count)-1][0] in [";",")","]"])):
             if (self.tokens[(self.count)][0] in [")","]",";",","]):
                 break
+            # id then [
             if (self.tokens[(self.count)+1][0] == "[") and (self.tokens[(self.count)][1] == "identifier"):
-                self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
+                self.newfile.write(self.tokens[self.count][0] + " " + (self.ST.KindOf((self.tokens[self.count][0]))) + " " + (self.ST.IndexOf((self.tokens[self.count][0]))) + " used\n")
                 self.count += 1
                 self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
                 self.count += 1
                 self.compileExpression()
                 break
+            # id then (
             elif (self.tokens[(self.count)+1][0] == "(") and (self.tokens[(self.count)][1] == "identifier"):
-                self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
+                self.newfile.write(self.tokens[self.count][0] + " " + (self.ST.KindOf((self.tokens[self.count][0]))) + " " + (self.ST.IndexOf((self.tokens[self.count][0]))) + " used\n")
                 self.count += 1
                 self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
                 self.count += 1
                 self.compileExpressionList()
                 break
+            # id then symbol
             elif (self.tokens[(self.count)+1][0] in ["&lt;","&gt;","&amp;","+","-","*","/","|","=","~"]) and (self.tokens[(self.count)][1] == "identifier"):
-                self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
+                self.newfile.write(self.tokens[self.count][0] + " " + (self.ST.KindOf((self.tokens[self.count][0]))) + " " + (self.ST.IndexOf((self.tokens[self.count][0]))) + " used\n")
                 self.count += 1
                 break
+            # ( then - or ~ | ( then id
             elif ((self.tokens[self.count][0] == "(") and ((self.tokens[(self.count)+1][0] in ["-","~"]))) or ((self.tokens[self.count][0] == "(") and (self.tokens[(self.count)+1][1] == "identifier")):
                 self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
                 self.count += 1
                 self.compileExpression()
                 break
+            # ( then (
             elif (self.tokens[self.count][0] == "(") and (self.tokens[(self.count)+1][0] == "("):
                 self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
                 self.count += 1
                 self.compileExpression()
                 break
+            # just - or ~
             elif (self.tokens[self.count][0] in ["~","-"]):
                 self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
                 self.count += 1
                 self.compileTerm()
                 break
+            # id then .
             elif (self.tokens[(self.count)+1][0] == ".") and (self.tokens[(self.count)][1] == "identifier"):
-                self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
+                self.newfile.write(self.tokens[self.count][0] + " " + (self.ST.KindOf((self.tokens[self.count][0]))) + " " + (self.ST.IndexOf((self.tokens[self.count][0]))) + " used\n")
                 self.count += 1
                 self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
                 self.count += 1
+            # just id
             elif (self.tokens[(self.count)][1] == "identifier"):
                 self.newfile.write(self.tokens[self.count][0] + " " + (self.ST.KindOf((self.tokens[self.count][0]))) + " " + (self.ST.IndexOf((self.tokens[self.count][0]))) + " used\n")
                 self.count += 1
@@ -559,7 +566,7 @@ class SymbolTable:
         if (kind in ["static","field"]):
             self.stdic[name] = (ttype + "," + kind + "," + str(self.VarCount(kind) + 1))
         else:
-            self.substdic[name] = (ttype + "," + kind + "," + str((self.VarCount(kind) + 2)))
+            self.substdic[name] = (ttype + "," + kind + "," + str((self.VarCount(kind) + 1)))
         return
 
     # counts how many of the current var kind already exist within the relevant
