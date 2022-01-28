@@ -31,6 +31,7 @@ def main():
     #tfiles.close()
 
     c = CompEngine(sys.argv[1],tokens)
+    v = VMWriter(sys.argv[1])
     c.compileClass()
 
     c.Close()
@@ -626,39 +627,63 @@ class SymbolTable:
                 return "NONE"
 
 
-#class VMWriter:
-#    def __init__(self):
-#        return
-#
-#    def writePush(self, segment, index):
-#        return
-#
-#    def writePop(self, segment, index):
-#        return
-#
-#    def writeArithmetic(self, command):
-#        return
-#
-#    def writeLabel(self, label):
-#        return
-#
-#    def writeGoto(self, label):
-#        return
-#
-#    def writeIf(self, label):
-#        return
-#
-#    def writeCall(self, name, nArgs):
-#        return
-#
-#    def writeFunction(self, name, nLocals):
-#        return
-#
-#    def writeReturn(self):
-#        return
-#
-#    def close(self):
-#        return
+class VMWriter:
+    # creates a new output .vm file and prepares it for writing
+    def __init__(self, filename):
+        nfilename = ((filename.split(".")[0]) +".vm")
+        print(nfilename)
+        self.newfile = open(nfilename, "w")
+
+    # Writes a VM push command to the output file with the given segment and
+    # index
+    def writePush(self, segment, index):
+        self.newfile.write("push " + segment + " " + index + "\n")
+        return
+
+    # Same as the push but for a pop command
+    def writePop(self, segment, index):
+        self.newfile.write("pop " + segment + " " + index + "\n")
+        return
+
+    # Writes the given command as a VM command (ADD, SUB, NEG, EQ, GT, LT, AND,
+    # OR, NOT) to the output file
+    def writeArithmetic(self, command):
+        self.newfile.write(command.lower() + "\n")
+        return
+
+    # Writes a VM label command with the given label
+    def writeLabel(self, label):
+        self.newfile.write("label " + label + "\n")
+        return
+
+    # Writes a VM goto command with the given label
+    def writeGoto(self, label):
+        self.newfile.write("goto " + label + "\n")
+        return
+
+    # writes a VM if-goto command with the given label
+    def writeIf(self, label):
+        self.newfile.write("if-goto " + label + "\n")
+        return
+
+    # writes a VM call command with the given name and arg number
+    def writeCall(self, name, nArgs):
+        self.newfile.write("call " + name + " " + nArgs + "\n")
+        return
+
+    # writes a VM function command with the given name and local number
+    def writeFunction(self, name, nLocals):
+        self.newfile.write("function " + name + " " + nLocals + "\n")
+        return
+
+    # writes a VM return command
+    def writeReturn(self):
+        self.newfile.write("return\n")
+        return
+
+    # closes the output file
+    def close(self):
+        self.newfile.close()
 
 
 # Starts the program
