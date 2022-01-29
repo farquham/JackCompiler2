@@ -31,7 +31,6 @@ def main():
     #tfiles.close()
 
     c = CompEngine(sys.argv[1],tokens)
-    v = VMWriter(sys.argv[1])
     c.compileClass()
 
     c.Close()
@@ -207,19 +206,23 @@ class Tokenizer:
 class CompEngine:
     # Creates new comp engine with given input and output files
     def __init__(self,filename,tokens):
-        nfilename = ((filename.split(".")[0]) +".xml")
+        nfilename = ((filename.split(".")[1]) +".xml")
         print(nfilename)
         self.newfile = open(nfilename, "w")
-        self.count = 0
+        self.count = 1
         self.tokens = tokens
+        self.v = VMWriter(filename)
+        self.arithdic = {"&lt;":"lt","&gt;":"gt","&amp;":"and","+":"add","-":"sub","*":"call Math.multiply 3","/":"call Math.divide 2","|":"or","=":"eq","~":"not","--":"neg"}
 
     # Compiles a complete class
     def compileClass(self):
         self.newfile.write("<class>\n")
-        self.classname = (self.tokens[(self.count)+1][0])
+        self.arithdic = {"&lt;":"lt","&gt;":"gt","&amp;":"and","+":"add","-":"sub","*":"call Math.multiply 3","/":"call Math.divide 2","|":"or","=":"eq","~":"not","--":"neg"}
         while (self.tokens[(self.count)][0] != "{"):
             self.newfile.write("<"+(self.tokens[self.count][1])+"> " + (self.tokens[self.count][0]) + " </"+(self.tokens[self.count][1])+">\n")
             self.count += 1
+        self.classname = (self.tokens[(self.count)-1][0])
+        self.kinddic = {"field":"this","static":"static","var":"local","argument":"argument","subroutine":"this","other":self.classname}
         self.newfile.write("<"+(self.tokens[self.count][1])+"> " + (self.tokens[self.count][0]) + " </"+(self.tokens[self.count][1])+">\n")
         self.count += 1
         self.ST = SymbolTable()
@@ -256,6 +259,8 @@ class CompEngine:
         self.newfile.write("<subroutineDec>\n")
         self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
         self.count += 1
+        self.funcname = (self.tokens[(self.count)+1][0])
+        self.argcount = 0
         self.ST.startSubroutine()
         if ((self.tokens[(self.count)-1][0]) == "method"):
             self.ST.define("this",self.classname,"argument")
@@ -267,6 +272,8 @@ class CompEngine:
             self.compileParameterList()
         if (self.tokens[self.count][0] == "{"):
             self.compileSubroutineBody()
+
+        #self.v.writeFunction((self.classname + "." + self.funcname), self.argcount)
         self.newfile.write("</subroutineDec>\n")
         return
 
@@ -276,7 +283,7 @@ class CompEngine:
         self.count += 1
         self.newfile.write("<parameterList>\n")
         while (self.tokens[self.count][0] != ")"):
-            if ((self.tokens[(self.count)][1] == "identifier") and (self.tokens[(self.count)-2][0] in ["(",","])):
+            if ((self.tokens[(self.count)][1] == "identifier") and (self.tokens[(self.count)-2][0] in ["(",",",";"])):
                 ttype = self.tokens[(self.count)-1][0]
                 kind = "argument"
                 self.ST.define((self.tokens[self.count][0]), ttype, kind)
@@ -292,9 +299,13 @@ class CompEngine:
         self.newfile.write("<subroutineBody>\n")
         self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
         self.count += 1
+        self.whilecount = 0
+        self.ifcount = 0
         while (self.tokens[(self.count)][0] != "}"):
             if (self.tokens[self.count][0] == "var"):
                 self.compileVarDec()
+                if (self.tokens[(self.count)][0] != "var"):
+                    self.v.writeFunction((self.classname + "." + self.funcname), self.argcount)
             if (self.tokens[self.count][0] in ["let","if","while","do","return"]):
                 self.compileStatements()
             if (self.tokens[(self.count)][0] in ["method","constructor","function"]):
@@ -311,9 +322,11 @@ class CompEngine:
                 ttype = self.tokens[(self.count)-1][0]
                 kind = self.tokens[(self.count)-2][0]
                 self.ST.define((self.tokens[self.count][0]), ttype, kind)
+                self.argcount += 1
                 self.newfile.write(self.tokens[self.count][0] + " " + kind + " " + (self.ST.IndexOf((self.tokens[self.count][0]))) + " defined\n")
             elif ((self.tokens[(self.count)][1] == "identifier") and (self.tokens[(self.count)-1][0] == ",")):
                 self.ST.define((self.tokens[self.count][0]), ttype, kind)
+                self.argcount += 1
                 self.newfile.write(self.tokens[self.count][0] + " " + kind + " " + (self.ST.IndexOf((self.tokens[self.count][0]))) + " defined\n")
             self.count += 1
             if ((self.tokens[(self.count)-1][0] == ";") and (self.tokens[self.count][0] == "var")):
@@ -329,12 +342,14 @@ class CompEngine:
                 self.compileLet()
             if (self.tokens[self.count][0] == "if"):
                 self.compileIf()
-            elif (self.tokens[self.count][0] == "while"):
+            if (self.tokens[self.count][0] == "while"):
                 self.compileWhile()
-            elif (self.tokens[self.count][0] == "do"):
+            if (self.tokens[self.count][0] == "do"):
                 self.compileDo()
-            elif (self.tokens[self.count][0] == "return"):
+            if (self.tokens[self.count][0] == "return"):
                 self.compileReturn()
+            if (self.tokens[(self.count)][0] in ["method","constructor","function"]):
+                break
         self.newfile.write("</statements>\n")
         self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
         self.count += 1
@@ -344,8 +359,12 @@ class CompEngine:
     def compileLet(self):
         self.newfile.write("<letStatement>\n")
         src = 0
+        firstcom = ""
+        self.Arithcoms = []
+        tokenlinecount = self.count
         while ((self.tokens[(self.count)-1][0] != ";") or (self.tokens[(self.count)][0] == "let")) and (src < 1):
             if (self.tokens[(self.count)][1] == "identifier"):
+                firstcom = self.tokens[self.count][0]
                 self.newfile.write((self.tokens[self.count][0]) + " " + (self.ST.KindOf((self.tokens[self.count][0]))) + " " + (self.ST.IndexOf((self.tokens[self.count][0]))) + " used\n")
                 self.count += 1
             if (self.tokens[self.count][0] in ["["]) :
@@ -360,6 +379,17 @@ class CompEngine:
             else:
                 self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
                 self.count += 1
+        self.Arithcoms.reverse()
+        for x in self.Arithcoms:
+            self.v.writeArithmetic(self.arithdic[x])
+        tokenlinecount = self.count - tokenlinecount
+        tokencheck = []
+        for x in range(0,tokenlinecount):
+            tokencheck.append(self.tokens[(self.count)-x][0])
+        print(tokencheck)
+        if (("Memory" in tokencheck) or ("Main" in tokencheck)):
+            self.v.writeCall(self.calll,self.nargcount)
+        self.v.writePop(self.kinddic[self.ST.KindOf(firstcom)],self.ST.IndexOf(firstcom))
         self.newfile.write("</letStatement>\n")
         return
 
@@ -396,6 +426,7 @@ class CompEngine:
     def compileWhile(self):
         self.newfile.write("<whileStatement>\n")
         src = 0
+        self.v.writeLabel("WHILE_EXP"+str(self.whilecount))
         while ((self.tokens[(self.count)-1][0] != "}") or (self.tokens[(self.count)][0] == "while")) and (src < 1):
              if (not(self.tokens[self.count][0] in ["(","{"])):
                 self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
@@ -404,6 +435,8 @@ class CompEngine:
                 self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
                 self.count += 1
                 self.compileExpression()
+                self.v.writeArithmetic("not")
+                self.v.writeIf("WHILE_END"+str(self.whilecount))
              if (self.tokens[self.count][0] == "{"):
                 self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
                 self.count += 1
@@ -416,12 +449,17 @@ class CompEngine:
     def compileDo(self):
         self.newfile.write("<doStatement>\n")
         src = 0
+        self.Arithcoms = []
+        self.callp1 = ""
+        self.callp2 = ""
         while ((self.tokens[(self.count)-1][0] != ";") or (self.tokens[(self.count)][0] == "do")):
             if (self.tokens[self.count][0] != "("):
                 if ((self.tokens[self.count][1] == "identifier") and (self.tokens[(self.count)-1][0] != ".")):
+                    self.callp1 = self.tokens[self.count][0]
                     self.newfile.write(self.tokens[self.count][0] + " " + (self.ST.KindOf((self.tokens[self.count][0]))) + " " + (self.ST.IndexOf((self.tokens[self.count][0]))) + " used\n")
                     self.count += 1
                 elif ((self.tokens[self.count][1] == "identifier") and (self.tokens[(self.count)-1][0] == ".")):
+                    self.callp2 = self.tokens[self.count][0]
                     self.newfile.write(self.tokens[self.count][0] + " " + "subroutine" + " used\n")
                     self.count += 1
                 else:
@@ -434,6 +472,11 @@ class CompEngine:
                 src += 1
             if ((self.tokens[(self.count)-1][0] == ";") and (self.tokens[(self.count)][0] == "do") and (src == 1)):
                 break
+        self.Arithcoms.reverse()
+        for x in self.Arithcoms:
+            self.v.writeArithmetic(self.arithdic[x])
+        self.v.writeCall((self.callp1 + "." + self.callp2),str(self.nargcount))
+        self.v.writePop("temp","0")
         self.newfile.write("</doStatement>\n")
         return
 
@@ -447,6 +490,7 @@ class CompEngine:
             else:
                 self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
                 self.count += 1
+        self.v.writeReturn()
         self.newfile.write("</returnStatement>\n")
         return
 
@@ -462,9 +506,13 @@ class CompEngine:
                 self.compileTerm()
             if (self.tokens[self.count][0] == "(") or ((self.tokens[self.count][0] in ["-","~"]) and (self.tokens[(self.count)-1][0] == "(")):
                 self.compileTerm()
+
             if (self.tokens[self.count][0] in [";",")","]",","]):
                 break
             else:
+                if ((self.tokens[self.count][0] == "-") and (self.tokens[(self.count)-1][1] == "symbol")):
+                    self.tokens[self.count][0] = "--"
+                self.Arithcoms.append(self.tokens[self.count][0])
                 self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
                 self.count += 1
         self.newfile.write("</expression>\n")
@@ -477,8 +525,11 @@ class CompEngine:
     def compileTerm(self):
         self.newfile.write("<term>\n")
         while (not(self.tokens[(self.count)-1][0] in [";",")","]"])):
-            if (self.tokens[(self.count)][0] in [")","]",";",","]):
+            if (self.tokens[(self.count)][0] in [")","]",";",",","*","+","-","/"]):
                 break
+            # int_const
+            if (self.tokens[self.count][1] == "int_const"):
+                self.v.writePush("constant", self.tokens[self.count][0])
             # id then [
             if (self.tokens[(self.count)+1][0] == "[") and (self.tokens[(self.count)][1] == "identifier"):
                 self.newfile.write(self.tokens[self.count][0] + " " + (self.ST.KindOf((self.tokens[self.count][0]))) + " " + (self.ST.IndexOf((self.tokens[self.count][0]))) + " used\n")
@@ -487,6 +538,10 @@ class CompEngine:
                 self.count += 1
                 self.compileExpression()
                 break
+            if (self.tokens[self.count][0] == "Memory"):
+                self.calll = (self.tokens[self.count][0] + "." + self.tokens[(self.count)+2][0])
+                self.count = self.count + 3
+                self.compileExpressionList()
             # id then (
             elif (self.tokens[(self.count)+1][0] == "(") and (self.tokens[(self.count)][1] == "identifier"):
                 self.newfile.write(self.tokens[self.count][0] + " " + (self.ST.KindOf((self.tokens[self.count][0]))) + " " + (self.ST.IndexOf((self.tokens[self.count][0]))) + " used\n")
@@ -498,6 +553,7 @@ class CompEngine:
             # id then symbol
             elif (self.tokens[(self.count)+1][0] in ["&lt;","&gt;","&amp;","+","-","*","/","|","=","~"]) and (self.tokens[(self.count)][1] == "identifier"):
                 self.newfile.write(self.tokens[self.count][0] + " " + (self.ST.KindOf((self.tokens[self.count][0]))) + " " + (self.ST.IndexOf((self.tokens[self.count][0]))) + " used\n")
+                self.v.writePush(self.kinddic[self.ST.KindOf(self.tokens[self.count][0])],self.ST.IndexOf(self.tokens[self.count][0]))
                 self.count += 1
                 break
             # ( then - or ~ | ( then id
@@ -512,21 +568,33 @@ class CompEngine:
                 self.count += 1
                 self.compileExpression()
                 break
-            # just - or ~
-            elif (self.tokens[self.count][0] in ["~","-"]):
+            # - or ~ then id
+            elif (self.tokens[self.count][0] in ["~","-"]) and (self.tokens[(self.count)+1][1] == "int_const"):
+                self.v.writePush(self.kinddic[self.ST.KindOf(self.tokens[(self.count)+1][0])],self.ST.IndexOf(self.tokens[(self.count)+1][0]))
+                argdic = {"-","neg","~","not"}
+                self.v.writeArithmetic(argdic[(self.tokens[self.count][0])])
+                self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
+                self.count += 1
                 self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
                 self.count += 1
                 self.compileTerm()
                 break
             # id then .
             elif (self.tokens[(self.count)+1][0] == ".") and (self.tokens[(self.count)][1] == "identifier"):
-                self.newfile.write(self.tokens[self.count][0] + " " + (self.ST.KindOf((self.tokens[self.count][0]))) + " " + (self.ST.IndexOf((self.tokens[self.count][0]))) + " used\n")
-                self.count += 1
-                self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
-                self.count += 1
+                self.calll = (self.tokens[self.count][0] + "." + self.tokens[(self.count)+2][0])
+                self.count = self.count + 3
+                self.compileExpressionList()
             # just id
             elif (self.tokens[(self.count)][1] == "identifier"):
+                self.v.writePush(self.kinddic[self.ST.KindOf(self.tokens[self.count][0])],self.ST.IndexOf(self.tokens[self.count][0]))
                 self.newfile.write(self.tokens[self.count][0] + " " + (self.ST.KindOf((self.tokens[self.count][0]))) + " " + (self.ST.IndexOf((self.tokens[self.count][0]))) + " used\n")
+                self.count += 1
+            elif (self.tokens[(self.count)][0] in ["true","false"]):
+                if (self.tokens[self.count][0] == "true"):
+                    self.v.writePush("constant","0")
+                    self.v.writeArithmetic("not")
+                else:
+                    self.v.writePush("constant","0")
                 self.count += 1
             else:
                 self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
@@ -537,9 +605,20 @@ class CompEngine:
     # Compiles a (maybe empty) comma-separated list of expressions
     def compileExpressionList(self):
         self.newfile.write("<expressionList>\n")
+        self.nargcount = 0
         while (self.tokens[(self.count)-1][0] != ")"):
-            if (self.tokens[(self.count)][1] != "symbol") or (self.tokens[(self.count)][0] == "("):
+            print(self.tokens[self.count][0])
+            if (self.tokens[(self.count)-2][0] == ")"):
+                break
+            elif (self.tokens[(self.count)][1] != "symbol") or (self.tokens[(self.count)][0] == "("):
                 self.compileExpression()
+                self.nargcount += 1
+            elif ((self.tokens[(self.count)][0] in ["-","~"]) and (self.tokens[(self.count)+1][1] == "int_const")):
+                self.compileExpression()
+                self.nargcount += 1
+            elif (self.tokens[self.count][0] == ","):
+                self.nargcount += 1
+                self.count += 1
             else:
                 self.newfile.write("<"+self.tokens[self.count][1]+"> " + self.tokens[self.count][0] + " </"+self.tokens[self.count][1]+">\n")
                 self.count += 1
@@ -549,6 +628,7 @@ class CompEngine:
     # closes the output file
     def Close(self):
         self.newfile.close()
+        self.v.close()
 
 # creates, stores, and updates the symbol tables needed to write the VM code
 class SymbolTable:
@@ -584,7 +664,7 @@ class SymbolTable:
                     count += 1
         return count
 
-    # returns the kind of the requested var
+    # returns the kind of the requested var (var, static, field, class, etc.)
     def KindOf(self, name):
         try:
             kkind = ((((self.substdic)[name]).split(","))[1])
@@ -598,7 +678,7 @@ class SymbolTable:
             else:
                 return "subroutine"
 
-    # returns the type of the requested var
+    # returns the type of the requested var (int, bool, etc.)
     def TypeOf(self, name):
         try:
             ttype = ((((self.substdic)[name]).split(","))[0])
@@ -624,7 +704,7 @@ class SymbolTable:
             if (name in self.stdic):
                 return ((((self.stdic)[name]).split(","))[2])
             else:
-                return "NONE"
+                return "0"
 
 
 class VMWriter:
@@ -637,18 +717,18 @@ class VMWriter:
     # Writes a VM push command to the output file with the given segment and
     # index
     def writePush(self, segment, index):
-        self.newfile.write("push " + segment + " " + index + "\n")
+        self.newfile.write("push " + segment + " " + str(index) + "\n")
         return
 
     # Same as the push but for a pop command
     def writePop(self, segment, index):
-        self.newfile.write("pop " + segment + " " + index + "\n")
+        self.newfile.write("pop " + segment + " " + str(index) + "\n")
         return
 
     # Writes the given command as a VM command (ADD, SUB, NEG, EQ, GT, LT, AND,
     # OR, NOT) to the output file
     def writeArithmetic(self, command):
-        self.newfile.write(command.lower() + "\n")
+        self.newfile.write(command + "\n")
         return
 
     # Writes a VM label command with the given label
@@ -668,16 +748,17 @@ class VMWriter:
 
     # writes a VM call command with the given name and arg number
     def writeCall(self, name, nArgs):
-        self.newfile.write("call " + name + " " + nArgs + "\n")
+        self.newfile.write("call " + name + " " + str(nArgs) + "\n")
         return
 
     # writes a VM function command with the given name and local number
     def writeFunction(self, name, nLocals):
-        self.newfile.write("function " + name + " " + nLocals + "\n")
+        self.newfile.write("function " + name + " " + str(nLocals) + "\n")
         return
 
     # writes a VM return command
     def writeReturn(self):
+        self.newfile.write("push constant 0\n")
         self.newfile.write("return\n")
         return
 
